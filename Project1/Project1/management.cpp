@@ -1,4 +1,5 @@
 #include "management.h"
+#include <algorithm>
 #include <queue>
 #include <iostream>
 #include <stdio.h>
@@ -6,9 +7,11 @@
 #include "Window.h"
 #include <string.h>
 #include <vector>
+#include <stack>
 
 using namespace std;
 
+#define heap pair<int,int>
 
 int op = 66;
 
@@ -32,10 +35,11 @@ struct Edge {
 };
 
 int edge_num = 0, point_num = 0;
-Edge edge[1000];
+Edge edge[20000];
 Point point[1000];
-int head[1000], nxt[1000];
+int head[20000], nxt[20000];
 short vis[1000];
+int fa[1000],Rank[1000];
 vector<int> dfn;
 
 management::management()
@@ -62,6 +66,10 @@ management::management()
 
 		menu_btns[i]->move(bx, by);
 	}
+}
+
+bool cmp(Edge a, Edge b) {
+	return a.value < b.value;
 }
 
 void management::run(){
@@ -190,7 +198,7 @@ void insert(int a, int b) {
 	nxt[edge_num] = head[a];
 	edge[edge_num].from = a;
 	edge[edge_num].to = b;
-	edge[edge_num].value = ((int)dist(point[a].x, point[a].y, point[b].x, point[b].y)) % 10;
+	edge[edge_num].value = ((int)dist(point[a].x, point[a].y, point[b].x, point[b].y));
 	head[a] = edge_num;
 	edge[edge_num].isDeleted = false;
 	edge[edge_num].color = BLACK;
@@ -309,10 +317,11 @@ void management::erase_edge()
 void Dfs(int u) {
 	dfn.push_back(u);
 	vis[u] = 1;
-	for (int i = head[u]; i != 0; i = nxt[i]) {
-		int v = edge[i].to;
-		if (!vis[v])	Dfs(v);
-	}
+	for (int i = head[u]; i != 0; i = nxt[i]) 
+		if (!edge[i].isDeleted){
+			int v = edge[i].to;
+			if (!vis[v])	Dfs(v);
+		}
 }
 
 void management::dfs()
@@ -320,7 +329,8 @@ void management::dfs()
 	Window::flushDraw();
 	memset(vis, 0, sizeof(vis));
 	dfn.clear();
-	Dfs(1);
+	for (int i = 1; i<=point_num; i++)
+		if (!vis[i]) Dfs(1);
 	
 	cout << "dfs OK " << dfn.size() << endl;
 
@@ -330,36 +340,206 @@ void management::dfs()
 		Window::flushDraw();
 		Sleep(2000);
 	}
+	op = 66;
 }
 
 void management::bfs()
 {
+	memset(vis, 0, sizeof(vis));
+	queue<int> Q;
+	Q.push(1);
+	while (!Q.empty()) {
+		int u = Q.front();
+		Q.pop();
+		point[u].color = RGB(237, 28, 36);
+		show_graph();
+		Window::flushDraw();
+		Sleep(2000);
+		vis[u] = 1;
+		for (int i = head[u]; i; i = nxt[i]) 
+			if (!edge[i].isDeleted)
+			{
+				int v = edge[i].to;
+				if (!vis[v])	Q.push(v);
+			}
+	}
+	op = 66;
+}
 
-	::outtextxy(0, 0, "bfs");
+int find(int x) {
+	if (x == fa[x])	return fa[x];
+	else return fa[x] = find(fa[x]);
+}
+
+void unite(int x, int y) {
+	x = find(x);
+	y = find(y);
+	if (Rank[x] < Rank[y]) {
+		fa[x] = y;
+	}
+	else {
+		fa[y] = x;
+		if (Rank[x] == Rank[y]) Rank[x]++;
+	}
 }
 
 void management::kruskal()
 {
-
-	::outtextxy(0, 0, "kruskal");
+	//::outtextxy(0, 0, "kruskal");
+	Edge e[1000];
+	for (int i = 1; i <= edge_num; i++)
+		e[i] = edge[i];
+	for (int i = 1; i <= point_num; i++) {
+		fa[i] = i;
+		Rank[i] = 0;
+	}
+	sort(e + 1, e + edge_num + 1, cmp);
+	int n = 0;
+	for (int i = 1; i <= edge_num && n!=point_num-1; i++) {
+		if (find(e[i].from) != find(e[i].to) && (!e[i].isDeleted)) {
+			unite(e[i].from, e[i].to);
+			n++;
+			setlinecolor(RGB(237,28,36));
+			line(point[e[i].from].x, point[e[i].from].y, point[e[i].to].x, point[e[i].to].y);
+			Window::flushDraw();
+			Sleep(2000);
+		}
+	}
+	op = 66;
 }
 
 void management::prim()
 {
+	#define INF  0x3f3f3f3f
+	priority_queue <heap, vector<heap>, greater<heap>> q;
+	int tot = point_num,u,v,e;
+	memset(vis, 0, sizeof(vis));
+	heap x;
+	q.push(make_pair(0, 0));
+	edge[0].to = 1;
+	while (!q.empty() && tot) 
+	{
+		x = q.top();
+		q.pop();
+		e = x.second;
+		u = edge[e].to;
+		if (vis[u]) continue;
+		vis[u] = 1;
+		tot--;
+		if (e != 0) {
+			setlinecolor(RGB(237, 28, 36));
+			line(point[edge[e].from].x, point[edge[e].from].y, point[edge[e].to].x, point[edge[e].to].y);
+			Window::flushDraw();
+			Sleep(2000);
+		}
 
-	::outtextxy(0, 0, "prim");
+		for (int i = head[u]; i; i = nxt[i])
+			if (!edge[i].isDeleted)
+			{
+				v = edge[i].to;
+				if (!vis[v])	q.push(make_pair(edge[i].value, i));
+			}
+	}
+	op = 66;
 }
 
 void management::linked()
 {
 
-	::outtextxy(0, 0, "linked");
+	//::outtextxy(0, 0, "linked");
+	memset(vis, 0, sizeof(vis));
+	Dfs(1);
+	for (int i = 1; i<=point_num; i++)
+	{
+		if (!vis[i]) {
+			::outtextxy(0, 550, "这不是一个连通图");
+			return;
+		}
+	}
+	::outtextxy(0, 550, "这是一个连通图");
 }
 
 void management::MinPath()
 {
+	int src, dst;
+	cout << "请输入两个结点的编号：";
+	cin >> src >> dst;
 
-	::outtextxy(0, 0, "min path");
+	int dist[1000],pre[1000];
+	for (int i = 1; i <= point_num; i++)
+		dist[i] = INF;
+	dist[src] = 0;
+	for (int i = 1; i <= point_num; i++)
+		pre[i] = i;
+	for (int i = head[src]; i; i = nxt[i])
+	if (!edge[i].isDeleted)
+		{
+			dist[edge[i].to] = edge[i].value;
+			if (edge[i].value < INF)
+				pre[edge[i].to] = src;
+		}
+	memset(vis, 0, sizeof(vis));
+	vis[src] = 1;
+
+	for (int i = 1; i<point_num; i++)
+	{
+		int minn = INF; int k = -1;
+		for (int j = 1; j <= point_num; j++)
+		{
+			if (vis[j] == 0 && dist[j] < minn) {
+				minn = dist[j];
+				k = j;
+			}
+		}
+		if (k == -1)	break;
+
+		vis[k] = 1;
+
+		for (int j = head[k]; j; j = nxt[j])
+			if (!edge[i].isDeleted)
+			{
+				if (!vis[edge[j].to]) {
+					if (dist[edge[j].to] > dist[k] + edge[j].value)
+					{
+						dist[edge[j].to] = dist[k] + edge[j].value;
+						pre[edge[j].to] = k;
+					}
+				}
+			}
+	}
+
+	if (dist[dst] >= INF)
+		::outtextxy(0, 0, "两点之间没有路径");
+	else {
+		char ans[100];
+		sprintf_s(ans, "两点之间最短距离是%d", dist[dst]);
+		settextcolor(BLACK);
+		::outtextxy(0, 0, ans);
+		Window::flushDraw();
+		stack<int> S;
+		int tmp = dst;
+		S.push(tmp);
+		while (tmp != src) {
+			tmp = pre[tmp];
+			S.push(tmp);
+		}
+
+		int last = S.top(),now;
+		S.pop();
+		while (!S.empty()) {
+			now = S.top();
+
+			setlinecolor(RGB(237, 28, 36));
+			line(point[last].x, point[last].y, point[now].x, point[now].y);
+			Window::flushDraw();
+			Sleep(2000);
+
+			last = now;
+			S.pop();
+		}
+	}
+
+	op = 66;
 }
 
 void management::show_graph()
